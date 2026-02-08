@@ -1,0 +1,18 @@
+[package]
+name = "insert-dylib"
+version = "0.1.0"
+edition = "2024"
+authors = ["YinMo19 <me@yinmo19.top>"]
+description = "Inject LC_LOAD_DYLIB / LC_LOAD_WEAK_DYLIB into Mach-O binaries."
+readme = "README.md"
+homepage = "https://blog.yinmo19.top"
+repository = "https://github.com/YinMo19/insert-dylib"
+license = "MIT"
+keywords = ["macho", "dylib", "patcher", "binary", "macos"]
+categories = ["command-line-utilities"]
+
+[package.metadata.docs.rs]
+default-target = "aarch64-apple-darwin"
+targets = ["aarch64-apple-darwin"]
+
+[dependencies]

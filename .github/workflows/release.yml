@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build release asset (macOS aarch64)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add target
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Package archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="insert-dylib-macos-aarch64"
+          mkdir -p dist "$package_dir"
+          cp "target/aarch64-apple-darwin/release/insert-dylib" "$package_dir/"
+          cp README.md README.cn.md LICENSE "$package_dir/"
+          tar -czf "dist/${package_dir}.tar.gz" "$package_dir"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: insert-dylib-macos-aarch64
+          path: dist/*.tar.gz
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p release-files
+          find dist -type f -name '*.tar.gz' -exec cp {} release-files/ \;
+
+      - name: Generate SHA256 checksums
+        run: |
+          set -euo pipefail
+          cd release-files
+          sha256sum *.tar.gz > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-files/*.tar.gz
+            release-files/SHA256SUMS.txt
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
