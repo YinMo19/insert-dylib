@@ -74,30 +74,6 @@ If `LC_CODE_SIGNATURE` is removed, the binary's signature is invalidated. Re-sig
 codesign --force --sign - MyApp.patched
 ```
 
-## CI and Release
-
-- CI workflow: `.github/workflows/ci.yml`
-  - Runs `fmt`, `check`, `clippy`, and `test` on **macOS aarch64**.
-- Release workflow: `.github/workflows/release.yml`
-  - Triggered when pushing tags like `v1.0.0`
-  - Builds **macOS aarch64** release binaries and publishes GitHub Release assets.
-
-Create a release tag:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-## Publish to crates.io
-
-Before publishing:
-
-```bash
-cargo package
-cargo publish
-```
-
 ## Legal / Safety
 
 Use this tool only on binaries you are authorized to modify.

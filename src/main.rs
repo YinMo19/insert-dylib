@@ -421,22 +421,22 @@ fn check_load_commands(
                             linkedit_filesize -= datasize;
                             let linkedit_vmsize = round_up(linkedit_filesize, 0x1000);
 
-                            if let Some(pos) = linkedit_32_pos {
-                                if let Some(mut seg) = linkedit_32 {
-                                    seg.filesize = swap32(linkedit_filesize as u32, mh.magic);
-                                    seg.vmsize = swap32(linkedit_vmsize as u32, mh.magic);
+                            if let Some(pos) = linkedit_32_pos
+                                && let Some(mut seg) = linkedit_32
+                            {
+                                seg.filesize = swap32(linkedit_filesize as u32, mh.magic);
+                                seg.vmsize = swap32(linkedit_vmsize as u32, mh.magic);
 
-                                    file.seek(SeekFrom::Start(pos))?;
-                                    write_struct(file, &seg)?;
-                                }
-                            } else if let Some(pos) = linkedit_64_pos {
-                                if let Some(mut seg) = linkedit_64 {
-                                    seg.filesize = swap64(linkedit_filesize, mh.magic);
-                                    seg.vmsize = swap64(linkedit_vmsize, mh.magic);
+                                file.seek(SeekFrom::Start(pos))?;
+                                write_struct(file, &seg)?;
+                            } else if let Some(pos) = linkedit_64_pos
+                                && let Some(mut seg) = linkedit_64
+                            {
+                                seg.filesize = swap64(linkedit_filesize, mh.magic);
+                                seg.vmsize = swap64(linkedit_vmsize, mh.magic);
 
-                                    file.seek(SeekFrom::Start(pos))?;
-                                    write_struct(file, &seg)?;
-                                }
+                                file.seek(SeekFrom::Start(pos))?;
+                                write_struct(file, &seg)?;
                             }
 
                             mh.ncmds = swap32(ncmds - 1, mh.magic);

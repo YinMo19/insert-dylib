@@ -74,30 +74,6 @@ insert-dylib --strip-codesig --overwrite @loader_path/libHook.dylib MyApp MyApp.
 codesign --force --sign - MyApp.patched
 ```
 
-## CI 与自动发布
-
-- CI 工作流：`.github/workflows/ci.yml`
-  - 在 **macOS aarch64** 上执行 `fmt`、`check`、`clippy`、`test`。
-- Release 工作流：`.github/workflows/release.yml`
-  - 当推送形如 `v1.0.0` 的 tag 时自动触发
-  - 构建 **macOS aarch64** 发布二进制并上传到 GitHub Release。
-
-发布示例：
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-## 发布到 crates.io
-
-发布前建议执行：
-
-```bash
-cargo package
-cargo publish
-```
-
 ## 法律与安全
 
 请仅对你有权限修改的二进制使用本工具。
