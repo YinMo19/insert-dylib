@@ -1,1 +1,11 @@
 /target
+.DS_Store
+
+# Example workspace outputs
+/examples/**/target/
+/examples/**/Cargo.lock
+
+# classic-tight-headerpad-case runtime artifacts
+/examples/classic-tight-headerpad-case/calc_*
+/examples/classic-tight-headerpad-case/*.dylib
+/examples/classic-tight-headerpad-case/calc_bin

@@ -48,6 +48,8 @@ If `new_binary_path` is omitted (and `--inplace` is not used), output defaults t
 
 ## Examples
 
+More case studies are in [`examples/`](./examples/README.md).
+
 Inject a dylib and write to default output:
 
 ```bash

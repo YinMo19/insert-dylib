@@ -48,6 +48,8 @@ insert-dylib [options] <dylib_path> <binary_path> [new_binary_path]
 
 ## 示例
 
+更多案例见 [`examples/`](./examples/README.md)。
+
 注入 dylib，输出到默认文件：
 
 ```bash
