@@ -45,6 +45,8 @@ If `new_binary_path` is omitted (and `--inplace` is not used), output defaults t
 - `--strip-codesig` force removing `LC_CODE_SIGNATURE` when possible
 - `--no-strip-codesig` never remove `LC_CODE_SIGNATURE`
 - `--all-yes` auto-answer `yes` to all interactive prompts
+- `--ios` rewrite dylib Mach-O platform markers from `macOS` to `iOS` (requires `--dylib-path`)
+- `--dylib-path <path>` local dylib file path used by `--ios` for Mach-O platform rewrite
 
 ## Examples
 
@@ -66,6 +68,12 @@ Force code-signature stripping and overwrite output:
 
 ```bash
 insert-dylib --strip-codesig --overwrite @loader_path/libHook.dylib MyApp MyApp.patched
+```
+
+Inject iOS install name while rewriting a local dylib file to iOS platform metadata:
+
+```bash
+insert-dylib --ios --dylib-path libarcaea_function.dylib @executable_path/Frameworks/libarcaea_function.dylib Arc-mobile
 ```
 
 ## Code Signing Note

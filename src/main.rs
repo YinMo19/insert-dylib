@@ -24,6 +24,12 @@ const LC_LOAD_DYLIB: u32 = 0xc;
 const LC_LOAD_WEAK_DYLIB: u32 = 0x80000018;
 const LC_SEGMENT_64: u32 = 0x19;
 const LC_CODE_SIGNATURE: u32 = 0x1d;
+const LC_VERSION_MIN_MACOSX: u32 = 0x24;
+const LC_VERSION_MIN_IPHONEOS: u32 = 0x25;
+const LC_BUILD_VERSION: u32 = 0x32;
+
+const PLATFORM_MACOS: u32 = 1;
+const PLATFORM_IOS: u32 = 2;
 
 const BUFSIZE: usize = 512;
 
@@ -130,6 +136,26 @@ struct LinkeditDataCommand {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
+struct VersionMinCommand {
+    cmd: u32,
+    cmdsize: u32,
+    version: u32,
+    sdk: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+struct BuildVersionCommand {
+    cmd: u32,
+    cmdsize: u32,
+    platform: u32,
+    minos: u32,
+    sdk: u32,
+    ntools: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 struct FatHeader {
     magic: u32,
     nfat_arch: u32,
@@ -152,6 +178,14 @@ struct Options {
     overwrite: bool,
     codesig_flag: u8,
     all_yes: bool,
+    ios: bool,
+    ios_dylib_path: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PlatformRewriteStats {
+    platform_commands: usize,
+    rewritten_commands: usize,
 }
 
 fn is_64_bit(magic: u32) -> bool {
@@ -193,8 +227,9 @@ fn absdiff(lhs: u64, rhs: u64) -> u64 {
 fn usage() -> ! {
     println!("Usage: insert-dylib dylib_path binary_path [new_binary_path]");
     println!(
-        "Option flags: --inplace --weak --overwrite --strip-codesig --no-strip-codesig --all-yes"
+        "Option flags: --inplace --weak --overwrite --strip-codesig --no-strip-codesig --all-yes --ios --dylib-path <path>"
     );
+    println!("Note: --ios requires --dylib-path <local_dylib_file>.");
     process::exit(1);
 }
 
@@ -599,12 +634,133 @@ fn insert_dylib(
     Ok(true)
 }
 
+fn rewrite_macho_platform_to_ios_slice(
+    file: &mut File,
+    header_offset: u64,
+) -> io::Result<PlatformRewriteStats> {
+    file.seek(SeekFrom::Start(header_offset))?;
+
+    let mh: MachHeader = read_struct(file)?;
+    if mh.magic != MH_MAGIC_64
+        && mh.magic != MH_CIGAM_64
+        && mh.magic != MH_MAGIC
+        && mh.magic != MH_CIGAM
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Unknown Mach-O magic: 0x{:x}", mh.magic),
+        ));
+    }
+
+    let commands_offset = header_offset
+        + if is_64_bit(mh.magic) {
+            size_of::<MachHeader64>() as u64
+        } else {
+            size_of::<MachHeader>() as u64
+        };
+
+    file.seek(SeekFrom::Start(commands_offset))?;
+    let ncmds = swap32(mh.ncmds, mh.magic);
+    let mut stats = PlatformRewriteStats::default();
+
+    for _ in 0..ncmds {
+        let command_offset = file.stream_position()?;
+        let lc: LoadCommand = peek_struct(file)?;
+        let cmd = swap32(lc.cmd, mh.magic);
+        let cmdsize = swap32(lc.cmdsize, mh.magic);
+
+        if cmdsize < size_of::<LoadCommand>() as u32 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "load command size is smaller than load_command",
+            ));
+        }
+
+        match cmd {
+            LC_BUILD_VERSION => {
+                if cmdsize < size_of::<BuildVersionCommand>() as u32 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "LC_BUILD_VERSION command is truncated",
+                    ));
+                }
+
+                let mut cmd_data: BuildVersionCommand = read_struct(file)?;
+                let platform = swap32(cmd_data.platform, mh.magic);
+                stats.platform_commands += 1;
+
+                if platform == PLATFORM_MACOS {
+                    cmd_data.platform = swap32(PLATFORM_IOS, mh.magic);
+                    file.seek(SeekFrom::Start(command_offset))?;
+                    write_struct(file, &cmd_data)?;
+                    stats.rewritten_commands += 1;
+                }
+            }
+            LC_VERSION_MIN_MACOSX => {
+                if cmdsize < size_of::<VersionMinCommand>() as u32 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "LC_VERSION_MIN_MACOSX command is truncated",
+                    ));
+                }
+
+                let mut cmd_data: VersionMinCommand = read_struct(file)?;
+                cmd_data.cmd = swap32(LC_VERSION_MIN_IPHONEOS, mh.magic);
+                file.seek(SeekFrom::Start(command_offset))?;
+                write_struct(file, &cmd_data)?;
+                stats.platform_commands += 1;
+                stats.rewritten_commands += 1;
+            }
+            LC_VERSION_MIN_IPHONEOS => {
+                stats.platform_commands += 1;
+            }
+            _ => {}
+        }
+
+        file.seek(SeekFrom::Start(command_offset + cmdsize as u64))?;
+    }
+
+    Ok(stats)
+}
+
+fn rewrite_dylib_platform_to_ios(path: &str) -> io::Result<PlatformRewriteStats> {
+    let mut file = File::options().read(true).write(true).open(path)?;
+    let magic: u32 = read_struct(&mut file)?;
+
+    match magic {
+        FAT_MAGIC | FAT_CIGAM => {
+            file.seek(SeekFrom::Start(0))?;
+            let fat_header: FatHeader = read_struct(&mut file)?;
+            let nfat_arch = swap32(fat_header.nfat_arch, magic) as usize;
+            let archs = read_fat_arches(&mut file, nfat_arch)?;
+
+            let mut total = PlatformRewriteStats::default();
+            for arch in archs {
+                let offset = swap32(arch.offset, magic) as u64;
+                let stats = rewrite_macho_platform_to_ios_slice(&mut file, offset)?;
+                total.platform_commands += stats.platform_commands;
+                total.rewritten_commands += stats.rewritten_commands;
+            }
+            Ok(total)
+        }
+        MH_MAGIC_64 | MH_CIGAM_64 | MH_MAGIC | MH_CIGAM => {
+            file.seek(SeekFrom::Start(0))?;
+            rewrite_macho_platform_to_ios_slice(&mut file, 0)
+        }
+        _ => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Unknown Mach-O magic: 0x{:x}", magic),
+        )),
+    }
+}
+
 fn parse_args() -> (Options, Vec<String>) {
     let mut options = Options::default();
     let mut positional = Vec::new();
 
+    let mut args = env::args().skip(1).peekable();
     let mut parsing_options = true;
-    for arg in env::args().skip(1) {
+    while let Some(arg) = args.next() {
         if parsing_options {
             if arg == "--" {
                 parsing_options = false;
@@ -619,7 +775,21 @@ fn parse_args() -> (Options, Vec<String>) {
                     "--strip-codesig" => options.codesig_flag = 1,
                     "--no-strip-codesig" => options.codesig_flag = 2,
                     "--all-yes" => options.all_yes = true,
-                    _ => usage(),
+                    "--ios" => options.ios = true,
+                    "--dylib-path" => {
+                        let path = args.next().unwrap_or_else(|| usage());
+                        options.ios_dylib_path = Some(path);
+                    }
+                    _ => {
+                        if let Some(path) = arg.strip_prefix("--dylib-path=") {
+                            if path.is_empty() {
+                                usage();
+                            }
+                            options.ios_dylib_path = Some(path.to_string());
+                        } else {
+                            usage();
+                        }
+                    }
                 }
                 continue;
             }
@@ -675,6 +845,35 @@ fn run() -> io::Result<i32> {
         )?
     {
         return Ok(1);
+    }
+
+    if options.ios_dylib_path.is_some() && !options.ios {
+        eprintln!("--dylib-path can only be used together with --ios.");
+        return Ok(1);
+    }
+
+    if options.ios {
+        let ios_dylib_path = options.ios_dylib_path.as_deref().unwrap_or_else(|| {
+            eprintln!("--ios requires --dylib-path <local_dylib_file>.");
+            usage();
+        });
+
+        if fs::metadata(ios_dylib_path).is_err() {
+            eprintln!("{ios_dylib_path}: not found (--dylib-path)");
+            return Ok(1);
+        }
+
+        let stats = rewrite_dylib_platform_to_ios(ios_dylib_path)?;
+        if stats.platform_commands == 0 {
+            println!("No platform load command found in {ios_dylib_path}; skipped --ios rewrite.");
+        } else if stats.rewritten_commands == 0 {
+            println!("{ios_dylib_path} already declares iOS platform; no rewrite needed.");
+        } else {
+            println!(
+                "Rewrote {} platform load command(s) from macOS to iOS in {ios_dylib_path}.",
+                stats.rewritten_commands
+            );
+        }
     }
 
     if !options.inplace {

@@ -45,6 +45,8 @@ insert-dylib [options] <dylib_path> <binary_path> [new_binary_path]
 - `--strip-codesig` 在可行时强制移除 `LC_CODE_SIGNATURE`
 - `--no-strip-codesig` 不移除 `LC_CODE_SIGNATURE`
 - `--all-yes` 对所有交互提示自动回答 `yes`
+- `--ios` 将 dylib 的 Mach-O 平台字段从 `macOS` 改为 `iOS`（必须配合 `--dylib-path`）
+- `--dylib-path <path>` 配合 `--ios` 使用的本地 dylib 文件路径，用于平台字段改写
 
 ## 示例
 
@@ -66,6 +68,12 @@ insert-dylib --weak --inplace @rpath/libHook.dylib MyApp
 
 ```bash
 insert-dylib --strip-codesig --overwrite @loader_path/libHook.dylib MyApp MyApp.patched
+```
+
+写入 iOS install name，并对本地 dylib 文件执行平台改写：
+
+```bash
+insert-dylib --ios --dylib-path libarcaea_function.dylib @executable_path/Frameworks/libarcaea_function.dylib Arc-mobile
 ```
 
 ## 代码签名说明

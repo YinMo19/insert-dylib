@@ -6,7 +6,7 @@ const LOG_MSG: &[u8] = b"[+] hooked: now x0 is 99.\n";
 extern "C" fn replace_logic(_address: u64, ctx: *mut HookContext) {
     unsafe {
         let _ = libc::write(
-            libc::STDERR_FILENO,
+            libc::STDOUT_FILENO,
             LOG_MSG.as_ptr() as *const libc::c_void,
             LOG_MSG.len(),
         );
