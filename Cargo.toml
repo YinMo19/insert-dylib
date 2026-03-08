@@ -1,6 +1,6 @@
 [package]
 name = "insert-dylib"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["YinMo19 <me@yinmo19.top>"]
 description = "Inject LC_LOAD_DYLIB / LC_LOAD_WEAK_DYLIB into Mach-O binaries."
