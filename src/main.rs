@@ -7,9 +7,6 @@ use std::path::Path;
 use std::process;
 use std::ptr;
 
-#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-compile_error!("insert-dylib currently supports only macOS aarch64.");
-
 const MH_MAGIC: u32 = 0xfeedface;
 const MH_CIGAM: u32 = 0xcefaedfe;
 const MH_MAGIC_64: u32 = 0xfeedfacf;

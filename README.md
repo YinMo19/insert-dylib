@@ -6,8 +6,9 @@ A Rust rewrite of `insert_dylib`: injects a new `LC_LOAD_DYLIB` (or `LC_LOAD_WEA
 
 ## Platform Support
 
-- Supported platform: **macOS aarch64 (Apple Silicon)**
-- Unsupported targets fail at compile time by design.
+- Host platforms: **macOS, Linux, and Windows**
+- Supported inputs: **Mach-O thin and fat binaries**
+- The implementation uses portable `std` file I/O only; no host-OS-specific APIs are required.
 
 ## Features
 
@@ -20,12 +21,13 @@ A Rust rewrite of `insert_dylib`: injects a new `LC_LOAD_DYLIB` (or `LC_LOAD_WEA
 ## Build
 
 ```bash
-cargo build --release --target aarch64-apple-darwin
+cargo build --release
 ```
 
 The binary will be at:
 
-- `target/aarch64-apple-darwin/release/insert-dylib`
+- macOS / Linux: `target/release/insert-dylib`
+- Windows: `target/release/insert-dylib.exe`
 
 ## Usage
 
@@ -78,7 +80,7 @@ insert-dylib --ios --dylib-path libarcaea_function.dylib @executable_path/Framew
 
 ## Code Signing Note
 
-If `LC_CODE_SIGNATURE` is removed, the binary's signature is invalidated. Re-sign the patched binary if needed:
+If `LC_CODE_SIGNATURE` is removed, the binary's signature is invalidated. Re-sign the patched binary if needed. The `codesign` command itself is only available on macOS:
 
 ```bash
 codesign --force --sign - MyApp.patched

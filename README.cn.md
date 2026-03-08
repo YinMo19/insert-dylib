@@ -6,8 +6,9 @@
 
 ## 平台支持
 
-- 仅支持：**macOS aarch64（Apple Silicon）**
-- 其它目标会在编译期直接报错（设计如此）。
+- 宿主平台支持：**macOS、Linux、Windows**
+- 处理对象支持：**Mach-O thin / fat binary**
+- 实现只依赖可移植的 `std` 文件 I/O，没有宿主系统专属 API。
 
 ## 功能
 
@@ -20,12 +21,13 @@
 ## 构建
 
 ```bash
-cargo build --release --target aarch64-apple-darwin
+cargo build --release
 ```
 
 生成的可执行文件位于：
 
-- `target/aarch64-apple-darwin/release/insert-dylib`
+- macOS / Linux：`target/release/insert-dylib`
+- Windows：`target/release/insert-dylib.exe`
 
 ## 用法
 
@@ -78,7 +80,7 @@ insert-dylib --ios --dylib-path libarcaea_function.dylib @executable_path/Framew
 
 ## 代码签名说明
 
-若移除了 `LC_CODE_SIGNATURE`，原签名会失效。需要的话请对补丁后的文件重新签名：
+若移除了 `LC_CODE_SIGNATURE`，原签名会失效。需要的话请对补丁后的文件重新签名。下面的 `codesign` 命令本身仅在 macOS 上可用：
 
 ```bash
 codesign --force --sign - MyApp.patched

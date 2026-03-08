@@ -10,8 +10,27 @@ permissions:
 
 jobs:
   build:
-    name: Build release asset (macOS aarch64)
-    runs-on: macos-14
+    name: Build release asset (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS arm64
+            artifact_name: insert-dylib-macos-aarch64
+            binary_name: insert-dylib
+            archive_glob: dist/*.tar.gz
+          - os: ubuntu-latest
+            label: Linux x86_64
+            artifact_name: insert-dylib-linux-x86_64
+            binary_name: insert-dylib
+            archive_glob: dist/*.tar.gz
+          - os: windows-latest
+            label: Windows x86_64
+            artifact_name: insert-dylib-windows-x86_64
+            binary_name: insert-dylib.exe
+            archive_glob: dist/*.zip
 
     steps:
       - name: Checkout
@@ -20,30 +39,39 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Add target
-        run: rustup target add aarch64-apple-darwin
-
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
       - name: Build release binary
-        run: cargo build --release --target aarch64-apple-darwin
+        run: cargo build --release
 
       - name: Package archive
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          package_dir="insert-dylib-macos-aarch64"
+          package_dir="${{ matrix.artifact_name }}"
           mkdir -p dist "$package_dir"
-          cp "target/aarch64-apple-darwin/release/insert-dylib" "$package_dir/"
+          cp "target/release/${{ matrix.binary_name }}" "$package_dir/"
           cp README.md README.cn.md LICENSE "$package_dir/"
           tar -czf "dist/${package_dir}.tar.gz" "$package_dir"
+
+      - name: Package archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packageDir = "${{ matrix.artifact_name }}"
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          Copy-Item "target/release/${{ matrix.binary_name }}" $packageDir
+          Copy-Item README.md, README.cn.md, LICENSE $packageDir
+          Compress-Archive -Path "$packageDir/*" -DestinationPath "dist/$packageDir.zip" -Force
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: insert-dylib-macos-aarch64
-          path: dist/*.tar.gz
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.archive_glob }}
 
   publish:
     name: Publish GitHub Release
@@ -60,19 +88,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-files
-          find dist -type f -name '*.tar.gz' -exec cp {} release-files/ \;
+          find dist -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release-files/ \;
 
       - name: Generate SHA256 checksums
         run: |
           set -euo pipefail
           cd release-files
-          sha256sum *.tar.gz > SHA256SUMS.txt
+          sha256sum *.tar.gz *.zip > SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release-files/*.tar.gz
+            release-files/*.zip
             release-files/SHA256SUMS.txt
           generate_release_notes: true
         env:

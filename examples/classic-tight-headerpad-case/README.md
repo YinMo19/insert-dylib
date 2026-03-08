@@ -13,7 +13,7 @@ This folder is a reproducible failure/success comparison for Mach-O dylib inject
 
 ## Prerequisites
 
-- macOS aarch64 (Apple Silicon)
+- This example itself requires macOS aarch64 (Apple Silicon)
 - `codesign` available in your environment
 
 ## Build and Run (Step-by-Step)

@@ -11,8 +11,4 @@ license = "MIT"
 keywords = ["macho", "dylib", "patcher", "binary", "macos"]
 categories = ["command-line-utilities"]
 
-[package.metadata.docs.rs]
-default-target = "aarch64-apple-darwin"
-targets = ["aarch64-apple-darwin"]
-
 [dependencies]
